@@ -94,6 +94,7 @@ spec:
 			t.Logf("failed to delete resources in '%s' namespace: %s", testID, err)
 		}
 	})
+	t.Cleanup(func() { dumpDiagnostics(t, ctx, testID) })
 
 	g.Eventually(func() bool {
 		err := verifyGitAndKustomization(ctx, testEnv.Client, testID, testID)

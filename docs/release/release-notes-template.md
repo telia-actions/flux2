@@ -26,6 +26,8 @@ The following template can be used for the GitHub release page:
 
 <!-- Text describing the most important changes in this release -->
 
+ℹ️ Please follow the [Upgrade Procedure for Flux v2.7+](https://github.com/fluxcd/flux2/discussions/5572) for a smooth upgrade from Flux v2.6 to the latest version.
+
 ### Fixes and improvements
 
 <!-- List of fixes and improvements to the controllers and CLI -->
@@ -36,7 +38,7 @@ The following template can be used for the GitHub release page:
 
 ## Components changelog
 
-- <name>-controller [v<version>](https://github.com/fluxcd/<name>-controller/blob/<version>/CHANGELOG.md
+- <name>-controller [v<version>](https://github.com/fluxcd/<name>-controller/blob/<version>/CHANGELOG.md)
 
 ## CLI changelog
 

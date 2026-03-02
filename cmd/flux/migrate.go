@@ -59,71 +59,82 @@ type APIVersions struct {
 
 // TODO: Update this mapping when new Flux minor versions are released!
 // latestAPIVersions contains the latest API versions for each GroupKind
-// for each supported Flux version. We maintain the latest two minor versions.
+// for each supported Flux version. The number of latest minor versions
+// we maintain here must match what's documented here:
+//
+// https://fluxcd.io/flux/releases/#supported-releases
 var latestAPIVersions = []APIVersions{
 	{
-		FluxVersion: "2.7",
-		LatestVersions: map[schema.GroupKind]string{
-			// source-controller
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.BucketKind}:           sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.GitRepositoryKind}:    sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.OCIRepositoryKind}:    sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmRepositoryKind}:   sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmChartKind}:        sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.ExternalArtifactKind}: sourcev1.GroupVersion.Version,
-
-			// kustomize-controller
-			{Group: kustomizev1.GroupVersion.Group, Kind: kustomizev1.KustomizationKind}: kustomizev1.GroupVersion.Version,
-
-			// helm-controller
-			{Group: helmv2.GroupVersion.Group, Kind: helmv2.HelmReleaseKind}: helmv2.GroupVersion.Version,
-
-			// notification-controller
-			{Group: notificationv1.GroupVersion.Group, Kind: notificationv1.ReceiverKind}:     notificationv1.GroupVersion.Version,
-			{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.AlertKind}:    notificationv1b3.GroupVersion.Version,
-			{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.ProviderKind}: notificationv1b3.GroupVersion.Version,
-
-			// image-reflector-controller
-			{Group: imagev1.GroupVersion.Group, Kind: imagev1.ImageRepositoryKind}: imagev1.GroupVersion.Version,
-			{Group: imagev1.GroupVersion.Group, Kind: imagev1.ImagePolicyKind}:     imagev1.GroupVersion.Version,
-
-			// image-automation-controller
-			{Group: imageautov1.GroupVersion.Group, Kind: imageautov1.ImageUpdateAutomationKind}: imageautov1.GroupVersion.Version,
-
-			// source-watcher
-			{Group: swv1b1.GroupVersion.Group, Kind: swv1b1.ArtifactGeneratorKind}: swv1b1.GroupVersion.Version,
-		},
+		FluxVersion:    "2.8",
+		LatestVersions: flux27LatestAPIVersions,
 	},
 	{
-		FluxVersion: "2.6",
-		LatestVersions: map[schema.GroupKind]string{
-			// source-controller
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.BucketKind}:           sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.GitRepositoryKind}:    sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.OCIRepositoryKind}:    sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmRepositoryKind}:   sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmChartKind}:        sourcev1.GroupVersion.Version,
-			{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.ExternalArtifactKind}: sourcev1.GroupVersion.Version,
-
-			// kustomize-controller
-			{Group: kustomizev1.GroupVersion.Group, Kind: kustomizev1.KustomizationKind}: kustomizev1.GroupVersion.Version,
-
-			// helm-controller
-			{Group: helmv2.GroupVersion.Group, Kind: helmv2.HelmReleaseKind}: helmv2.GroupVersion.Version,
-
-			// notification-controller
-			{Group: notificationv1.GroupVersion.Group, Kind: notificationv1.ReceiverKind}:     notificationv1.GroupVersion.Version,
-			{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.AlertKind}:    notificationv1b3.GroupVersion.Version,
-			{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.ProviderKind}: notificationv1b3.GroupVersion.Version,
-
-			// image-reflector-controller
-			{Group: imagev1b2.GroupVersion.Group, Kind: imagev1b2.ImageRepositoryKind}: imagev1b2.GroupVersion.Version,
-			{Group: imagev1b2.GroupVersion.Group, Kind: imagev1b2.ImagePolicyKind}:     imagev1b2.GroupVersion.Version,
-
-			// image-automation-controller
-			{Group: imageautov1b2.GroupVersion.Group, Kind: imageautov1b2.ImageUpdateAutomationKind}: imageautov1b2.GroupVersion.Version,
-		},
+		FluxVersion:    "2.7",
+		LatestVersions: flux27LatestAPIVersions,
 	},
+	{
+		FluxVersion:    "2.6",
+		LatestVersions: flux26LatestAPIVersions,
+	},
+}
+
+var flux27LatestAPIVersions = map[schema.GroupKind]string{
+	// source-controller
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.BucketKind}:           sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.GitRepositoryKind}:    sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.OCIRepositoryKind}:    sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmRepositoryKind}:   sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmChartKind}:        sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.ExternalArtifactKind}: sourcev1.GroupVersion.Version,
+
+	// kustomize-controller
+	{Group: kustomizev1.GroupVersion.Group, Kind: kustomizev1.KustomizationKind}: kustomizev1.GroupVersion.Version,
+
+	// helm-controller
+	{Group: helmv2.GroupVersion.Group, Kind: helmv2.HelmReleaseKind}: helmv2.GroupVersion.Version,
+
+	// notification-controller
+	{Group: notificationv1.GroupVersion.Group, Kind: notificationv1.ReceiverKind}:     notificationv1.GroupVersion.Version,
+	{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.AlertKind}:    notificationv1b3.GroupVersion.Version,
+	{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.ProviderKind}: notificationv1b3.GroupVersion.Version,
+
+	// image-reflector-controller
+	{Group: imagev1.GroupVersion.Group, Kind: imagev1.ImageRepositoryKind}: imagev1.GroupVersion.Version,
+	{Group: imagev1.GroupVersion.Group, Kind: imagev1.ImagePolicyKind}:     imagev1.GroupVersion.Version,
+
+	// image-automation-controller
+	{Group: imageautov1.GroupVersion.Group, Kind: imageautov1.ImageUpdateAutomationKind}: imageautov1.GroupVersion.Version,
+
+	// source-watcher
+	{Group: swv1b1.GroupVersion.Group, Kind: swv1b1.ArtifactGeneratorKind}: swv1b1.GroupVersion.Version,
+}
+
+var flux26LatestAPIVersions = map[schema.GroupKind]string{
+	// source-controller
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.BucketKind}:           sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.GitRepositoryKind}:    sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.OCIRepositoryKind}:    sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmRepositoryKind}:   sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.HelmChartKind}:        sourcev1.GroupVersion.Version,
+	{Group: sourcev1.GroupVersion.Group, Kind: sourcev1.ExternalArtifactKind}: sourcev1.GroupVersion.Version,
+
+	// kustomize-controller
+	{Group: kustomizev1.GroupVersion.Group, Kind: kustomizev1.KustomizationKind}: kustomizev1.GroupVersion.Version,
+
+	// helm-controller
+	{Group: helmv2.GroupVersion.Group, Kind: helmv2.HelmReleaseKind}: helmv2.GroupVersion.Version,
+
+	// notification-controller
+	{Group: notificationv1.GroupVersion.Group, Kind: notificationv1.ReceiverKind}:     notificationv1.GroupVersion.Version,
+	{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.AlertKind}:    notificationv1b3.GroupVersion.Version,
+	{Group: notificationv1b3.GroupVersion.Group, Kind: notificationv1b3.ProviderKind}: notificationv1b3.GroupVersion.Version,
+
+	// image-reflector-controller
+	{Group: imagev1b2.GroupVersion.Group, Kind: imagev1b2.ImageRepositoryKind}: imagev1b2.GroupVersion.Version,
+	{Group: imagev1b2.GroupVersion.Group, Kind: imagev1b2.ImagePolicyKind}:     imagev1b2.GroupVersion.Version,
+
+	// image-automation-controller
+	{Group: imageautov1b2.GroupVersion.Group, Kind: imageautov1b2.ImageUpdateAutomationKind}: imageautov1b2.GroupVersion.Version,
 }
 
 var migrateCmd = &cobra.Command{

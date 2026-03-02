@@ -19,6 +19,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ func TestOCIHelmRelease(t *testing.T) {
 	}
 	g.Expect(testEnv.Create(ctx, &namespace)).To(Succeed())
 	defer testEnv.Delete(ctx, &namespace)
+	t.Cleanup(func() { dumpDiagnostics(t, ctx, testID) })
 
 	repoURL := fmt.Sprintf("%s/charts/podinfo", cfg.testRegistry)
 	err := pushImagesFromURL(repoURL, "ghcr.io/stefanprodan/charts/podinfo:6.2.0", []string{"6.2.0"})
@@ -97,23 +99,31 @@ func TestOCIHelmRelease(t *testing.T) {
 			Namespace: helmRelease.Namespace,
 		}
 		if err := testEnv.Get(ctx, nn, chart); err != nil {
-			t.Logf("error getting helm chart %s\n", err.Error())
+			t.Logf("error getting helm chart: %s", err.Error())
 			return false
 		}
 		if err := checkReadyCondition(chart); err != nil {
-			t.Log(err)
+			t.Logf("HelmChart not ready: %s", err)
 			return false
 		}
 
 		obj := &helmv2.HelmRelease{}
 		nn = types.NamespacedName{Name: helmRelease.Name, Namespace: helmRelease.Namespace}
 		if err := testEnv.Get(ctx, nn, obj); err != nil {
-			t.Logf("error getting helm release %s\n", err.Error())
+			t.Logf("error getting helm release: %s", err.Error())
 			return false
 		}
 
 		if err := checkReadyCondition(obj); err != nil {
-			t.Log(err)
+			// Log all HelmRelease conditions for full picture.
+			var condSummary []string
+			for _, c := range obj.Status.Conditions {
+				condSummary = append(condSummary, fmt.Sprintf("%s=%s (%s)", c.Type, c.Status, c.Message))
+			}
+			t.Logf("HelmRelease not ready: conditions=[%s]", strings.Join(condSummary, "; "))
+
+			// Log pod states in the release namespace.
+			logNamespacePods(t, ctx, testID)
 			return false
 		}
 

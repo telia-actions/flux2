@@ -34,6 +34,7 @@ import (
 func TestFluxInstallation(t *testing.T) {
 	g := NewWithT(t)
 	ctx := context.TODO()
+	t.Cleanup(func() { dumpDiagnostics(t, ctx, "flux-system") })
 	g.Eventually(func() bool {
 		err := verifyGitAndKustomization(ctx, testEnv.Client, "flux-system", "flux-system")
 		if err != nil {
@@ -114,6 +115,7 @@ metadata:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewWithT(t)
+			ctx := context.TODO()
 			ref := &sourcev1.GitRepositoryRef{
 				Branch: branchName,
 			}
@@ -143,6 +145,7 @@ metadata:
 					t.Logf("failed to delete resources in '%s' namespace: %s", tt.name, err)
 				}
 			})
+			t.Cleanup(func() { dumpDiagnostics(t, ctx, testID) })
 
 			g.Eventually(func() bool {
 				err := verifyGitAndKustomization(ctx, testEnv.Client, testID, testID)

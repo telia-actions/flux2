@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"testing"
 	"time"
 
 	extgogit "github.com/go-git/go-git/v5"
@@ -37,6 +38,9 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	helmv2 "github.com/fluxcd/helm-controller/api/v2"
+	automationv1 "github.com/fluxcd/image-automation-controller/api/v1"
+	reflectorv1 "github.com/fluxcd/image-reflector-controller/api/v1"
 	kustomizev1 "github.com/fluxcd/kustomize-controller/api/v1"
 	"github.com/fluxcd/pkg/apis/meta"
 	"github.com/fluxcd/pkg/git"
@@ -411,10 +415,164 @@ func checkReadyCondition(from conditions.Getter) error {
 	if conditions.IsReady(from) {
 		return nil
 	}
-	errMsg := fmt.Sprintf("object not ready")
+	errMsg := "object not ready"
 	readyMsg := conditions.GetMessage(from, meta.ReadyCondition)
 	if readyMsg != "" {
 		errMsg += ": " + readyMsg
 	}
 	return errors.New(errMsg)
+}
+
+// dumpDiagnostics prints Flux object states and controller logs when a test
+// has failed. It should be registered via t.Cleanup so that it runs after the
+// test body completes.
+func dumpDiagnostics(t *testing.T, ctx context.Context, namespace string) {
+	t.Helper()
+	if !t.Failed() {
+		return
+	}
+
+	t.Log("=== Diagnostics dump (test failed) ===")
+	dumpFluxObjects(t, ctx, namespace)
+	dumpControllerLogs(t, ctx)
+	t.Log("=== End diagnostics dump ===")
+}
+
+// dumpFluxObjects lists Flux custom resources in the given namespace and prints
+// their status conditions.
+func dumpFluxObjects(t *testing.T, ctx context.Context, namespace string) {
+	t.Helper()
+	listOpts := &client.ListOptions{Namespace: namespace}
+
+	gitRepos := &sourcev1.GitRepositoryList{}
+	if err := testEnv.List(ctx, gitRepos, listOpts); err == nil {
+		for _, r := range gitRepos.Items {
+			logObjectStatus(t, "GitRepository", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	helmRepos := &sourcev1.HelmRepositoryList{}
+	if err := testEnv.List(ctx, helmRepos, listOpts); err == nil {
+		for _, r := range helmRepos.Items {
+			logObjectStatus(t, "HelmRepository", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	helmCharts := &sourcev1.HelmChartList{}
+	if err := testEnv.List(ctx, helmCharts, listOpts); err == nil {
+		for _, r := range helmCharts.Items {
+			logObjectStatus(t, "HelmChart", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	kustomizations := &kustomizev1.KustomizationList{}
+	if err := testEnv.List(ctx, kustomizations, listOpts); err == nil {
+		for _, r := range kustomizations.Items {
+			logObjectStatus(t, "Kustomization", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	helmReleases := &helmv2.HelmReleaseList{}
+	if err := testEnv.List(ctx, helmReleases, listOpts); err == nil {
+		for _, r := range helmReleases.Items {
+			logObjectStatus(t, "HelmRelease", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	imageRepos := &reflectorv1.ImageRepositoryList{}
+	if err := testEnv.List(ctx, imageRepos, listOpts); err == nil {
+		for _, r := range imageRepos.Items {
+			logObjectStatus(t, "ImageRepository", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	imagePolicies := &reflectorv1.ImagePolicyList{}
+	if err := testEnv.List(ctx, imagePolicies, listOpts); err == nil {
+		for _, r := range imagePolicies.Items {
+			logObjectStatus(t, "ImagePolicy", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+
+	imageAutomations := &automationv1.ImageUpdateAutomationList{}
+	if err := testEnv.List(ctx, imageAutomations, listOpts); err == nil {
+		for _, r := range imageAutomations.Items {
+			logObjectStatus(t, "ImageUpdateAutomation", r.Name, r.Namespace, r.Status.Conditions)
+		}
+	}
+}
+
+// logObjectStatus prints the status conditions of a Flux object.
+func logObjectStatus(t *testing.T, kind, name, namespace string, conditions []metav1.Condition) {
+	t.Helper()
+	t.Logf("  %s/%s (ns: %s):", kind, name, namespace)
+	for _, c := range conditions {
+		t.Logf("    %s: %s — %s (since %s)", c.Type, c.Status, c.Message, c.LastTransitionTime.Format(time.RFC3339))
+	}
+}
+
+// dumpControllerLogs prints the logs of all Flux controller pods in the
+// flux-system namespace.
+func dumpControllerLogs(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	podList, err := testEnv.ClientGo.CoreV1().Pods("flux-system").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Logf("failed to list flux-system pods: %v", err)
+		return
+	}
+
+	for _, pod := range podList.Items {
+		logs, err := testEnv.ClientGo.
+			CoreV1().
+			Pods(pod.Namespace).
+			GetLogs(pod.Name, &corev1.PodLogOptions{}).
+			DoRaw(ctx)
+		if err != nil {
+			t.Logf("failed to get logs for pod %s: %v", pod.Name, err)
+			continue
+		}
+		t.Logf("=== Logs for pod %s ===\n%s", pod.Name, string(logs))
+	}
+}
+
+// logNamespacePods logs the state of all pods in the given namespace,
+// including container statuses and recent events. Useful for understanding
+// why a Helm install is stuck.
+func logNamespacePods(t *testing.T, ctx context.Context, namespace string) {
+	t.Helper()
+
+	podList := &corev1.PodList{}
+	if err := testEnv.List(ctx, podList, &client.ListOptions{Namespace: namespace}); err != nil {
+		t.Logf("  failed to list pods in %s: %v", namespace, err)
+		return
+	}
+	if len(podList.Items) == 0 {
+		t.Logf("  no pods in namespace %s", namespace)
+		return
+	}
+	for _, pod := range podList.Items {
+		t.Logf("  pod %s: phase=%s", pod.Name, pod.Status.Phase)
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.State.Waiting != nil {
+				t.Logf("    container %s: waiting — %s: %s", cs.Name, cs.State.Waiting.Reason, cs.State.Waiting.Message)
+			} else if cs.State.Terminated != nil {
+				t.Logf("    container %s: terminated — %s (exit %d)", cs.Name, cs.State.Terminated.Reason, cs.State.Terminated.ExitCode)
+			} else if cs.State.Running != nil {
+				t.Logf("    container %s: running (ready=%v)", cs.Name, cs.Ready)
+			}
+		}
+	}
+
+	// Log recent events in the namespace for scheduling/pull failures.
+	events, err := testEnv.ClientGo.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		t.Logf("  failed to list events in %s: %v", namespace, err)
+		return
+	}
+	if len(events.Items) > 0 {
+		t.Logf("  events in namespace %s:", namespace)
+		for _, e := range events.Items {
+			t.Logf("    %s %s/%s: %s — %s", e.Type, e.InvolvedObject.Kind, e.InvolvedObject.Name, e.Reason, e.Message)
+		}
+	}
 }

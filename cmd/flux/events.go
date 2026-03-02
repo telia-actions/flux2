@@ -196,11 +196,14 @@ func getRows(ctx context.Context, kubeclient client.Client, clientListOpts []cli
 
 func addEventsToList(ctx context.Context, kubeclient client.Client, el *corev1.EventList, clientListOpts []client.ListOption) error {
 	listOpts := &metav1.ListOptions{}
-	clientListOpts = append(clientListOpts, client.Limit(cmdutil.DefaultChunkSize))
 	err := runtimeresource.FollowContinue(listOpts,
 		func(options metav1.ListOptions) (runtime.Object, error) {
 			newEvents := &corev1.EventList{}
-			if err := kubeclient.List(ctx, newEvents, clientListOpts...); err != nil {
+			opts := append(clientListOpts, client.Limit(cmdutil.DefaultChunkSize))
+			if options.Continue != "" {
+				opts = append(opts, client.Continue(options.Continue))
+			}
+			if err := kubeclient.List(ctx, newEvents, opts...); err != nil {
 				return nil, fmt.Errorf("error getting events: %w", err)
 			}
 			el.Items = append(el.Items, newEvents.Items...)

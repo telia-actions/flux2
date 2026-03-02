@@ -20,11 +20,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -417,6 +419,108 @@ func createEvent(obj client.Object, eventType, msg, reason string) corev1.Event 
 			Name:      obj.GetName(),
 		},
 	}
+}
+
+// paginatedClient wraps a client.Client and simulates real Kubernetes API
+// pagination by splitting List results into pages of pageSize items,
+// using the ListMeta.Continue token.
+type paginatedClient struct {
+	client.Client
+	pageSize int
+}
+
+func (c *paginatedClient) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	listOpts := &client.ListOptions{}
+	listOpts.ApplyOptions(opts)
+
+	// Fetch all results from the underlying client (without Limit/Continue).
+	stripped := make([]client.ListOption, 0, len(opts))
+	for _, o := range opts {
+		if _, ok := o.(client.Limit); ok {
+			continue
+		}
+		if _, ok := o.(client.Continue); ok {
+			continue
+		}
+		stripped = append(stripped, o)
+	}
+	if err := c.Client.List(ctx, list, stripped...); err != nil {
+		return err
+	}
+
+	items, err := meta.ExtractList(list)
+	if err != nil {
+		return err
+	}
+
+	// Determine the page window based on the Continue token.
+	start := 0
+	if listOpts.Continue != "" {
+		n, err := strconv.Atoi(listOpts.Continue)
+		if err != nil {
+			return fmt.Errorf("invalid continue token: %w", err)
+		}
+		start = n
+	}
+	if start > len(items) {
+		start = len(items)
+	}
+
+	end := start + c.pageSize
+	if end > len(items) {
+		end = len(items)
+	}
+
+	page := items[start:end]
+	if err := meta.SetList(list, page); err != nil {
+		return err
+	}
+
+	// Set the Continue token when there are more pages.
+	listAccessor, err := meta.ListAccessor(list)
+	if err != nil {
+		return err
+	}
+	if end < len(items) {
+		listAccessor.SetContinue(strconv.Itoa(end))
+	} else {
+		listAccessor.SetContinue("")
+	}
+
+	return nil
+}
+
+func Test_addEventsToList_pagination(t *testing.T) {
+	g := NewWithT(t)
+	objs, err := ssautil.ReadObjects(strings.NewReader(objects))
+	g.Expect(err).To(Not(HaveOccurred()))
+
+	builder := fake.NewClientBuilder().WithScheme(utils.NewScheme())
+	for _, obj := range objs {
+		builder = builder.WithObjects(obj)
+	}
+
+	eventList := &corev1.EventList{}
+	for _, obj := range objs {
+		infoEvent := createEvent(obj, eventv1.EventSeverityInfo, "Info Message", "Info Reason")
+		warningEvent := createEvent(obj, eventv1.EventSeverityError, "Error Message", "Error Reason")
+		eventList.Items = append(eventList.Items, infoEvent, warningEvent)
+	}
+	builder = builder.WithLists(eventList)
+	c := builder.Build()
+
+	totalEvents := len(eventList.Items)
+	g.Expect(totalEvents).To(BeNumerically(">", 2), "need more than 2 events to test pagination")
+
+	// Wrap the client to paginate at 2 items per page, forcing multiple
+	// round-trips through FollowContinue.
+	pc := &paginatedClient{Client: c, pageSize: 2}
+
+	el := &corev1.EventList{}
+	err = addEventsToList(context.Background(), pc, el, nil)
+	g.Expect(err).To(Not(HaveOccurred()))
+	g.Expect(el.Items).To(HaveLen(totalEvents),
+		"addEventsToList should collect all events across paginated responses")
 }
 
 func kindNameIndexer(obj client.Object) []string {

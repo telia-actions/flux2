@@ -169,19 +169,19 @@ func BuildWithRoot(root, base string) ([]byte, error) {
 		return nil, fmt.Errorf("%s not found", konfig.DefaultKustomizationFileName())
 	}
 
-	// TODO(hidde): work around for a bug in kustomize causing it to
-	//  not properly handle absolute paths on Windows.
-	//  Convert the path to a relative path to the working directory
-	//  as a temporary fix:
-	//  https://github.com/kubernetes-sigs/kustomize/issues/2789
+	// Convert absolute paths to relative when possible, for kustomize
+	// compatibility. If filepath.Rel fails (e.g. paths on different
+	// Windows drives), keep the absolute path — kustomize handles
+	// absolute paths correctly since go-getter was removed.
+	// See: https://github.com/kubernetes-sigs/kustomize/issues/2789
+	//      https://github.com/fluxcd/flux2/issues/1153
 	if filepath.IsAbs(base) {
 		wd, err := os.Getwd()
 		if err != nil {
 			return nil, err
 		}
-		base, err = filepath.Rel(wd, base)
-		if err != nil {
-			return nil, err
+		if relBase, err := filepath.Rel(wd, base); err == nil {
+			base = relBase
 		}
 	}
 

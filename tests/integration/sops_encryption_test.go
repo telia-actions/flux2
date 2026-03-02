@@ -104,6 +104,7 @@ stringData:
 			log.Printf("failed to delete resources in '%s' namespace", testID)
 		}
 	})
+	t.Cleanup(func() { dumpDiagnostics(t, ctx, testID) })
 
 	if cfg.sopsSecretData != nil {
 		secret := corev1.Secret{
